@@ -1,0 +1,54 @@
+name: Fix Mobile Foundation Peers
+
+on:
+  push:
+    branches:
+      - feature/foundation-00
+
+permissions:
+  contents: write
+
+jobs:
+  fix-mobile-foundation:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v5
+        with:
+          ref: feature/foundation-00
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install current lockfile
+        working-directory: mobile
+        run: npm ci
+
+      - name: Install Expo Router peer dependencies
+        working-directory: mobile
+        run: npx expo install expo-constants expo-linking
+
+      - name: Remove obsolete Expo config field
+        working-directory: mobile
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'app.json';
+          const config = JSON.parse(fs.readFileSync(path, 'utf8'));
+          delete config.expo.newArchEnabled;
+          fs.writeFileSync(path, JSON.stringify(config, null, 2) + '\n');
+          NODE
+
+      - name: Remove helper and commit fix
+        run: |
+          git rm .github/workflows/fix-mobile-foundation.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/app.json mobile/package.json mobile/package-lock.json
+          git commit -m "fix(mobile): satisfy Expo foundation doctor checks"
+          git push origin HEAD:feature/foundation-00
