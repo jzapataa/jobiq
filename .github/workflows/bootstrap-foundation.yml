@@ -36,9 +36,9 @@ jobs:
       - name: Resolve Expo SDK 57 dependencies
         working-directory: mobile
         run: |
-          npm install expo@~57.0.21 react@19.2.3 react-native@0.86.3 axios@^1.12.2 zustand@^5.0.8
+          npm install expo@~57.0.21 react@19.2.3 react-dom@19.2.3 react-native@0.86.3 react-native-web@~0.21.0 axios@^1.12.2 zustand@^5.0.8
           npx expo install expo-router expo-secure-store react-native-gesture-handler react-native-reanimated react-native-worklets expo-font react-native-safe-area-context react-native-screens expo-status-bar
-          npm install --save-dev typescript@~6.0.3 @types/react@~19.2.2 eslint eslint-config-expo jest jest-expo @types/jest
+          npm install --save-dev typescript@~6.0.3 @types/react@~19.2.2 eslint eslint-config-expo jest jest-expo @types/jest@29.5.14
           npx expo install --fix
 
       - name: Verify backend
