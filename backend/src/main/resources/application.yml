@@ -20,14 +20,16 @@ management:
         include: health
   endpoint:
     health:
-      probes:
-        enabled: true
       show-details: never
       show-components: never
       group:
         liveness:
           include: livenessState
   health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: false
     db:
       enabled: false
 

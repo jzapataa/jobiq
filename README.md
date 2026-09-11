@@ -28,6 +28,27 @@ docs/                     Product, architecture and deployment documentation
 docker-compose.yml        Local PostgreSQL only
 ```
 
+### Backend module convention
+
+The base Java package is `com.jobiq`. Business modules will follow the approved package-by-feature convention:
+
+```text
+com.jobiq
+|-- auth
+|-- users
+|-- candidates
+|-- recruiters
+|-- companies
+|-- skills
+|-- jobs
+|-- feed
+|-- swipes
+|-- applications
+`-- shared
+```
+
+Slice 0 does not create dummy classes merely to make empty packages exist. Packages are added physically when real implementation requires them; `shared` currently contains only Foundation configuration.
+
 ## Technical baseline
 
 ### Backend

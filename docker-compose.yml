@@ -9,7 +9,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - jobiq-postgres-data:/var/lib/postgresql/data
+      - jobiq-postgres-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U jobiq -d jobiq"]
       interval: 5s
