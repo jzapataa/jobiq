@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: feature/foundation-00
 
@@ -25,7 +25,7 @@ jobs:
           java-version: '25'
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
 
@@ -40,6 +40,16 @@ jobs:
           npx expo install expo-router expo-secure-store react-native-gesture-handler react-native-reanimated react-native-worklets expo-font react-native-safe-area-context react-native-screens expo-status-bar
           npm install --save-dev typescript@~6.0.3 @types/react@~19.2.2 eslint eslint-config-expo jest jest-expo @types/jest@29.5.14
           npx expo install --fix
+
+      - name: Commit resolved toolchains
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/.mvn backend/mvnw backend/mvnw.cmd mobile/package.json mobile/package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: lock foundation toolchains"
+            git push origin HEAD:feature/foundation-00
+          fi
 
       - name: Verify backend
         working-directory: backend
@@ -114,15 +124,6 @@ jobs:
           npm test
           npx expo-doctor@latest
           npx expo export --platform android --output-dir dist
-
-      - name: Commit generated toolchain files
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add backend/.mvn backend/mvnw backend/mvnw.cmd mobile/package.json mobile/package-lock.json
-          git diff --cached --quiet && exit 0
-          git commit -m "chore: lock foundation toolchains"
-          git push origin HEAD:feature/foundation-00
 
       - name: Cleanup
         if: always()

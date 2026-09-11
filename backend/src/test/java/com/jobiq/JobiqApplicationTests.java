@@ -2,14 +2,16 @@ package com.jobiq;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.resttestclient.TestRestTemplate;
-import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -18,7 +20,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 @ActiveProfiles("test")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@AutoConfigureTestRestTemplate
 class JobiqApplicationTests {
 
     @Container
@@ -28,8 +29,10 @@ class JobiqApplicationTests {
             .withUsername("jobiq")
             .withPassword("jobiq-test");
 
-    @Autowired
-    private TestRestTemplate restTemplate;
+    @Value("${local.server.port}")
+    private int port;
+
+    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Test
     void contextStartsWithPostgreSql() {
@@ -37,13 +40,21 @@ class JobiqApplicationTests {
     }
 
     @Test
-    void livenessIsPublicAndGenericHealthIsNotPublic() {
-        ResponseEntity<String> liveness = restTemplate.getForEntity("/actuator/health/liveness", String.class);
-        ResponseEntity<String> genericHealth = restTemplate.getForEntity("/actuator/health", String.class);
+    void livenessIsPublicAndGenericHealthIsNotPublic() throws IOException, InterruptedException {
+        HttpResponse<String> liveness = get("/actuator/health/liveness");
+        HttpResponse<String> genericHealth = get("/actuator/health");
 
-        assertThat(liveness.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(liveness.getBody()).contains("\"status\":\"UP\"");
-        assertThat(liveness.getBody()).doesNotContain("db");
-        assertThat(genericHealth.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(liveness.statusCode()).isEqualTo(200);
+        assertThat(liveness.body()).contains("\"status\":\"UP\"");
+        assertThat(liveness.body()).doesNotContain("db");
+        assertThat(genericHealth.statusCode()).isEqualTo(403);
+    }
+
+    private HttpResponse<String> get(String path) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + port + path))
+                .GET()
+                .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 }

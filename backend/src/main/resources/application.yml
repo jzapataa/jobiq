@@ -20,6 +20,8 @@ management:
         include: health
   endpoint:
     health:
+      probes:
+        enabled: false
       show-details: never
       show-components: never
       group:
