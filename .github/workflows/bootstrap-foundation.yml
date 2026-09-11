@@ -1,4 +1,4 @@
-name: Bootstrap Foundation Toolchains
+name: Finalize Foundation Documentation
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  bootstrap:
+  finalize-docs:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -18,116 +18,17 @@ jobs:
         with:
           ref: feature/foundation-00
 
-      - name: Set up Java 25
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '25'
-
-      - name: Set up Node 24
-        uses: actions/setup-node@v5
-        with:
-          node-version: '24'
-
-      - name: Generate Maven Wrapper
-        working-directory: backend
-        run: mvn -N wrapper:wrapper -Dmaven=3.9.11
-
-      - name: Resolve Expo SDK 57 dependencies
-        working-directory: mobile
+      - name: Restore original FINAL documents
         run: |
-          npm install expo@~57.0.21 react@19.2.3 react-dom@19.2.3 react-native@0.86.3 react-native-web@~0.21.0 axios@^1.12.2 zustand@^5.0.8
-          npx expo install expo-router expo-secure-store react-native-gesture-handler react-native-reanimated react-native-worklets expo-font react-native-safe-area-context react-native-screens expo-status-bar
-          npm install --save-dev typescript@~6.0.3 @types/react@~19.2.2 eslint eslint-config-expo jest jest-expo @types/jest@29.5.14
-          npx expo install --fix
+          cat .foundation-docs/bp_* | base64 -d | gzip -d > docs/JOBIQ_BLUEPRINT_v0.1_FINAL.md
+          cat .foundation-docs/td_* | base64 -d | gzip -d > docs/JOBIQ_TECHNICAL_DESIGN_v0.1_FINAL.md
+          echo 'f8f429925d3729a10cd4097d45094df6428549a432673ae562d5ecf93da23d59  docs/JOBIQ_BLUEPRINT_v0.1_FINAL.md' | sha256sum -c -
+          echo 'dc79ec4aeaab6844950619c1caca78a7ce48548f521285cdf7cb106472c56d9f  docs/JOBIQ_TECHNICAL_DESIGN_v0.1_FINAL.md' | sha256sum -c -
 
-      - name: Commit resolved toolchains
+      - name: Commit original FINAL documents
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add backend/.mvn backend/mvnw backend/mvnw.cmd mobile/package.json mobile/package-lock.json
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: lock foundation toolchains"
-            git push origin HEAD:feature/foundation-00
-          fi
-
-      - name: Verify backend
-        working-directory: backend
-        run: ./mvnw -B verify
-
-      - name: Start local PostgreSQL
-        run: docker compose up -d postgres
-
-      - name: Wait for PostgreSQL health
-        run: |
-          for attempt in {1..30}; do
-            status="$(docker inspect --format='{{.State.Health.Status}}' jobiq-postgres 2>/dev/null || true)"
-            if [ "$status" = "healthy" ]; then
-              exit 0
-            fi
-            sleep 2
-          done
-          docker compose logs postgres
-          exit 1
-
-      - name: Smoke start backend LOCAL
-        working-directory: backend
-        run: |
-          SPRING_PROFILES_ACTIVE=local java -jar target/jobiq-backend-*.jar > /tmp/jobiq-local.log 2>&1 &
-          echo $! > /tmp/jobiq-local.pid
-          for attempt in {1..45}; do
-            if curl --silent --fail http://localhost:8080/actuator/health/liveness >/tmp/liveness.json; then
-              cat /tmp/liveness.json
-              break
-            fi
-            if [ "$attempt" -eq 45 ]; then
-              cat /tmp/jobiq-local.log
-              exit 1
-            fi
-            sleep 2
-          done
-          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://localhost:8080/actuator/health)" = "403"
-
-      - name: Build Docker image
-        run: docker build -t jobiq-api:foundation ./backend
-
-      - name: Smoke Docker image
-        run: |
-          kill "$(cat /tmp/jobiq-local.pid)" || true
-          docker run --detach --rm \
-            --name jobiq-api-foundation \
-            --network host \
-            -e SPRING_PROFILES_ACTIVE=local \
-            -e DB_URL=jdbc:postgresql://localhost:5432/jobiq \
-            -e DB_USERNAME=jobiq \
-            -e DB_PASSWORD=jobiq-local \
-            -e PORT=18081 \
-            jobiq-api:foundation
-          for attempt in {1..45}; do
-            if curl --silent --fail http://localhost:18081/actuator/health/liveness >/tmp/container-liveness.json; then
-              cat /tmp/container-liveness.json
-              break
-            fi
-            if [ "$attempt" -eq 45 ]; then
-              docker logs jobiq-api-foundation
-              exit 1
-            fi
-            sleep 2
-          done
-
-      - name: Validate mobile
-        working-directory: mobile
-        run: |
-          npm ci
-          npm run typecheck
-          npm run lint
-          npm test
-          npx expo-doctor@latest
-          npx expo export --platform android --output-dir dist
-
-      - name: Cleanup
-        if: always()
-        run: |
-          if [ -f /tmp/jobiq-local.pid ]; then kill "$(cat /tmp/jobiq-local.pid)" || true; fi
-          docker rm -f jobiq-api-foundation >/dev/null 2>&1 || true
-          docker compose down
+          git add docs/JOBIQ_BLUEPRINT_v0.1_FINAL.md docs/JOBIQ_TECHNICAL_DESIGN_v0.1_FINAL.md
+          git commit -m "docs: add final architecture sources"
+          git push origin HEAD:feature/foundation-00
