@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:18.6
+    container_name: jobiq-postgres
+    environment:
+      POSTGRES_DB: jobiq
+      POSTGRES_USER: jobiq
+      POSTGRES_PASSWORD: jobiq-local
+    ports:
+      - "5432:5432"
+    volumes:
+      - jobiq-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobiq -d jobiq"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+volumes:
+  jobiq-postgres-data:

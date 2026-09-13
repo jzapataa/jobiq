@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:3}
+      minimum-idle: ${DB_POOL_MIN_IDLE:0}
+      connection-timeout: 10000
+      idle-timeout: 60000
+      keepalive-time: 0
+
+server:
+  tomcat:
+    threads:
+      max: 20
+      min-spare: 2
+
+logging:
+  level:
+    com.jobiq: INFO

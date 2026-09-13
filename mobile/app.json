@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Jobiq",
+    "slug": "jobiq",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "jobiq",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font"
+    ],
+    "android": {
+      "package": "com.jobiq.app"
+    },
+    "ios": {
+      "bundleIdentifier": "com.jobiq.app",
+      "supportsTablet": true
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
