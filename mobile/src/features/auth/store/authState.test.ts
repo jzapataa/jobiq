@@ -1,9 +1,9 @@
 import { createInitialAuthState } from './authState';
 
-describe('createInitialAuthState', () => {
-  it('boots deterministically into the unauthenticated public experience', () => {
+describe('auth state foundation', () => {
+  it('starts in checking state for session bootstrap', () => {
     expect(createInitialAuthState()).toEqual({
-      status: 'unauthenticated',
+      status: 'checking',
       user: null,
       accessToken: null,
       bootstrapError: null,
