@@ -8,6 +8,12 @@ spring:
       hibernate:
         format_sql: true
 
+jobiq:
+  security:
+    jwt:
+      secret: ${JWT_SECRET:jobiq-local-development-jwt-secret-change-me-2026}
+      issuer: ${JWT_ISSUER:jobiq-api-local}
+
 logging:
   level:
     com.jobiq: DEBUG
