@@ -11,7 +11,7 @@ export interface AuthStateSnapshot {
 
 export function createInitialAuthState(): AuthStateSnapshot {
   return {
-    status: 'unauthenticated',
+    status: 'checking',
     user: null,
     accessToken: null,
     bootstrapError: null,
