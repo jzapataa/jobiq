@@ -5,6 +5,8 @@ server:
 spring:
   application:
     name: jobiq-api
+  autoconfigure:
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
   jpa:
     open-in-view: false
     hibernate:

@@ -16,6 +16,9 @@ Neon project: jobiq-dev
 PostgreSQL major: 18
 Region: Frankfurt / Europe Central
 Database: jobiq
+Connection: direct read/write endpoint
+TLS: required
+Pooler: not used
 ```
 
 ## PROD
@@ -120,3 +123,27 @@ No readiness probe, external ping, uptime bot or keep-alive traffic is configure
 ## Zero-cost policy
 
 Jobiq V1 uses free tiers only. No payment card, pay-as-you-go activation or automatic billing is introduced. If a selected provider requires a payment method, provider selection must be reopened rather than adding a card.
+
+## Accepted deviations
+
+### DEV-DEPLOY-01 — Neon provisioning deviation
+
+`jobiq-dev` is provisioned inside a Neon organization managed by Vercel because the current Neon access does not allow creating a standalone Neon project directly.
+
+```text
+Architecture impact: NONE
+Runtime impact: NONE
+Product impact: NONE
+Portability impact: LOW
+Accepted for V1: YES
+```
+
+Vercel is not part of the Jobiq runtime. Render connects directly to Neon through standard PostgreSQL JDBC/TLS.
+
+## Observations
+
+### DEV-OBS-01 — Render Free cold start
+
+The observed DEV startup took approximately 102 seconds from Spring startup to `Started JobiqApplication` on Render Free.
+
+This does not block Slice 1. `EXPO_PUBLIC_API_TIMEOUT_MS` is not changed here; the remote mobile timeout should be reevaluated later in the appropriate mobile/UX slice using this evidence.
