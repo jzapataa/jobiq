@@ -6,6 +6,13 @@ spring:
     hibernate:
       ddl-auto: validate
 
+jobiq:
+  security:
+    jwt:
+      secret: jobiq-test-jwt-secret-minimum-32-characters-2026
+      issuer: jobiq-api-test
+      ttl: PT8H
+
 management:
   endpoint:
     health:

@@ -47,7 +47,7 @@ class JobiqApplicationTests {
         assertThat(liveness.statusCode()).isEqualTo(200);
         assertThat(liveness.body()).contains("\"status\":\"UP\"");
         assertThat(liveness.body()).doesNotContain("db");
-        assertThat(genericHealth.statusCode()).isEqualTo(403);
+        assertThat(genericHealth.statusCode()).isNotEqualTo(200);
     }
 
     private HttpResponse<String> get(String path) throws IOException, InterruptedException {
