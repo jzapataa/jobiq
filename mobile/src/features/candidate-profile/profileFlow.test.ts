@@ -1,3 +1,4 @@
+import { ApiError } from '../../core/api/apiError';
 import type { CandidateProfilePayload, CandidateProfileSaveResult } from './api/candidateProfileApi';
 import { saveCandidateOnboarding, serializeSkills } from './profileFlow';
 
@@ -36,11 +37,21 @@ describe('candidate profile flow', () => {
     expect(refreshSession).toHaveBeenCalledTimes(1);
   });
 
-  it('does not refresh auth state when profile save fails', async () => {
-    const save = jest.fn().mockRejectedValue(new Error('validation'));
+  it('propagates validation errors and does not refresh auth state', async () => {
+    const validationError = new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'Request validation failed',
+      null,
+      [{ field: 'headline', message: 'must not be blank' }],
+    );
+    const save = jest.fn().mockRejectedValue(validationError);
     const refreshSession = jest.fn().mockResolvedValue(undefined);
 
-    await expect(saveCandidateOnboarding(payload, refreshSession, save)).rejects.toThrow('validation');
+    await expect(saveCandidateOnboarding(payload, refreshSession, save)).rejects.toMatchObject({
+      status: 400,
+      code: 'VALIDATION_ERROR',
+    });
     expect(refreshSession).not.toHaveBeenCalled();
   });
 });

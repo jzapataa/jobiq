@@ -1,5 +1,10 @@
-import type { RecruiterProfilePayload, RecruiterProfileSaveResult } from './api/recruiterProfileApi';
-import { saveRecruiterOnboarding } from './profileFlow';
+import type {
+  CompanyPayload,
+  CompanyResponse,
+  RecruiterProfilePayload,
+  RecruiterProfileSaveResult,
+} from './api/recruiterProfileApi';
+import { saveCompanyEdit, saveRecruiterOnboarding } from './profileFlow';
 
 const payload: RecruiterProfilePayload = {
   position: 'Technical Recruiter',
@@ -45,5 +50,25 @@ describe('recruiter profile flow', () => {
 
     expect(save).toHaveBeenCalledWith(payload);
     expect(refreshSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('saves a full company replacement payload', async () => {
+    const companyPayload: CompanyPayload = {
+      name: 'Example Updated',
+      description: 'Updated company',
+      website: null,
+      logoUrl: null,
+      location: 'Madrid',
+    };
+    const response: CompanyResponse = {
+      id: 'company-id',
+      ...companyPayload,
+      createdAt: '2026-09-15T00:00:00Z',
+      updatedAt: '2026-09-15T01:00:00Z',
+    };
+    const save = jest.fn().mockResolvedValue(response);
+
+    await expect(saveCompanyEdit(companyPayload, save)).resolves.toEqual(response);
+    expect(save).toHaveBeenCalledWith(companyPayload);
   });
 });

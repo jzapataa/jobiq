@@ -6,7 +6,8 @@ import { ThemeTextInput } from '@/components/ThemeTextInput';
 import { ThemedText } from '@/components/ThemedText';
 import { toApiError } from '@/core/api/apiError';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
-import { getRecruiterCompany, putRecruiterCompany } from '@/features/recruiter-profile/api/recruiterProfileApi';
+import { getRecruiterCompany } from '@/features/recruiter-profile/api/recruiterProfileApi';
+import { saveCompanyEdit } from '@/features/recruiter-profile/profileFlow';
 import { useThemeColor } from '@/theme/useThemeColor';
 
 export default function RecruiterCompanyScreen() {
@@ -43,7 +44,7 @@ export default function RecruiterCompanyScreen() {
     setSaving(true);
     setMessage(null);
     try {
-      await putRecruiterCompany({
+      await saveCompanyEdit({
         name,
         description,
         website: nullable(website),
