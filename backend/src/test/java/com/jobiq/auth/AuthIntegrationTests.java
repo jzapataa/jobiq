@@ -1,21 +1,21 @@
 package com.jobiq.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -25,8 +25,6 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -36,12 +34,12 @@ import com.jobiq.users.domain.User;
 import com.jobiq.users.domain.UserRole;
 import com.jobiq.users.repository.UserRepository;
 
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 @Testcontainers
 @ActiveProfiles("test")
-@SpringBootTest
-@AutoConfigureMockMvc
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AuthIntegrationTests {
 
     @Container
@@ -51,8 +49,8 @@ class AuthIntegrationTests {
             .withUsername("jobiq")
             .withPassword("jobiq-test");
 
-    @Autowired
-    private MockMvc mockMvc;
+    @Value("${local.server.port}")
+    private int port;
 
     @Autowired
     private UserRepository userRepository;
@@ -72,6 +70,8 @@ class AuthIntegrationTests {
     @Autowired
     private JsonMapper jsonMapper;
 
+    private final HttpClient httpClient = HttpClient.newHttpClient();
+
     @BeforeEach
     void clearUsers() {
         userRepository.deleteAll();
@@ -79,9 +79,13 @@ class AuthIntegrationTests {
 
     @Test
     void candidateRegistrationNormalizesEmailAndStoresHashedPassword() throws Exception {
-        register(" CANDIDATE@Example.COM ", "candidate-password", "Candidate", "CANDIDATE")
-                .andExpect(status().isCreated());
+        HttpResponse<String> response = register(
+                " CANDIDATE@Example.COM ",
+                "candidate-password",
+                "Candidate",
+                "CANDIDATE");
 
+        assertThat(response.statusCode()).isEqualTo(201);
         User stored = userRepository.findByEmail("candidate@example.com").orElseThrow();
         assertThat(stored.getRole()).isEqualTo(UserRole.CANDIDATE);
         assertThat(stored.getPasswordHash()).isNotEqualTo("candidate-password");
@@ -90,9 +94,13 @@ class AuthIntegrationTests {
 
     @Test
     void recruiterRegistrationSucceeds() throws Exception {
-        register("recruiter@example.com", "recruiter-password", "Recruiter", "RECRUITER")
-                .andExpect(status().isCreated());
+        HttpResponse<String> response = register(
+                "recruiter@example.com",
+                "recruiter-password",
+                "Recruiter",
+                "RECRUITER");
 
+        assertThat(response.statusCode()).isEqualTo(201);
         assertThat(userRepository.findByEmail("recruiter@example.com"))
                 .get()
                 .extracting(User::getRole)
@@ -101,29 +109,34 @@ class AuthIntegrationTests {
 
     @Test
     void duplicateEmailIsRejectedAfterNormalization() throws Exception {
-        register("candidate@example.com", "first-password", "Candidate", "CANDIDATE")
-                .andExpect(status().isCreated());
+        assertThat(register("candidate@example.com", "first-password", "Candidate", "CANDIDATE").statusCode())
+                .isEqualTo(201);
 
-        register("CANDIDATE@example.com", "second-password", "Other", "RECRUITER")
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("EMAIL_ALREADY_EXISTS"));
+        HttpResponse<String> duplicate = register(
+                "CANDIDATE@example.com",
+                "second-password",
+                "Other",
+                "RECRUITER");
+
+        assertThat(duplicate.statusCode()).isEqualTo(409);
+        assertThat(json(duplicate).get("code").asString()).isEqualTo("EMAIL_ALREADY_EXISTS");
     }
 
     @Test
     void loginSucceedsAndJwtContainsExpectedClaims() throws Exception {
-        register("candidate@example.com", "candidate-password", "Candidate", "CANDIDATE")
-                .andExpect(status().isCreated());
+        assertThat(register("candidate@example.com", "candidate-password", "Candidate", "CANDIDATE").statusCode())
+                .isEqualTo(201);
 
-        MvcResult result = login("candidate@example.com", "candidate-password")
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tokenType").value("Bearer"))
-                .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.expiresAt").isNotEmpty())
-                .andReturn();
+        HttpResponse<String> login = login("candidate@example.com", "candidate-password");
+        assertThat(login.statusCode()).isEqualTo(200);
 
-        String token = jsonMapper.readTree(result.getResponse().getContentAsString())
-                .get("accessToken")
-                .asString();
+        JsonNode payload = json(login);
+        assertThat(payload.get("tokenType").asString()).isEqualTo("Bearer");
+        assertThat(payload.get("expiresAt").asString()).isNotBlank();
+
+        String token = payload.get("accessToken").asString();
+        assertThat(token).isNotBlank();
+
         Jwt jwt = jwtDecoder.decode(token);
         User user = userRepository.findByEmail("candidate@example.com").orElseThrow();
 
@@ -136,37 +149,39 @@ class AuthIntegrationTests {
 
     @Test
     void wrongPasswordReturnsInvalidCredentialsWithoutAccountEnumeration() throws Exception {
-        register("candidate@example.com", "candidate-password", "Candidate", "CANDIDATE")
-                .andExpect(status().isCreated());
+        assertThat(register("candidate@example.com", "candidate-password", "Candidate", "CANDIDATE").statusCode())
+                .isEqualTo(201);
 
-        login("candidate@example.com", "wrong-password")
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+        HttpResponse<String> wrongPassword = login("candidate@example.com", "wrong-password");
+        HttpResponse<String> missingUser = login("missing@example.com", "wrong-password");
 
-        login("missing@example.com", "wrong-password")
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+        assertThat(wrongPassword.statusCode()).isEqualTo(401);
+        assertThat(json(wrongPassword).get("code").asString()).isEqualTo("INVALID_CREDENTIALS");
+        assertThat(missingUser.statusCode()).isEqualTo(401);
+        assertThat(json(missingUser).get("code").asString()).isEqualTo("INVALID_CREDENTIALS");
     }
 
     @Test
     void authMeWithoutTokenIsUnauthenticated() throws Exception {
-        mockMvc.perform(get("/api/v1/auth/me"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        HttpResponse<String> response = get("/api/v1/auth/me", null);
+
+        assertThat(response.statusCode()).isEqualTo(401);
+        assertThat(json(response).get("code").asString()).isEqualTo("UNAUTHENTICATED");
     }
 
     @Test
     void authMeWithValidTokenReturnsUserAndTransitionalIncompleteProfile() throws Exception {
-        register("candidate@example.com", "candidate-password", "Candidate", "CANDIDATE")
-                .andExpect(status().isCreated());
+        assertThat(register("candidate@example.com", "candidate-password", "Candidate", "CANDIDATE").statusCode())
+                .isEqualTo(201);
         String token = loginToken("candidate@example.com", "candidate-password");
 
-        mockMvc.perform(get("/api/v1/auth/me")
-                        .header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").value("candidate@example.com"))
-                .andExpect(jsonPath("$.role").value("CANDIDATE"))
-                .andExpect(jsonPath("$.profileComplete").value(false));
+        HttpResponse<String> response = get("/api/v1/auth/me", token);
+        JsonNode payload = json(response);
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(payload.get("email").asString()).isEqualTo("candidate@example.com");
+        assertThat(payload.get("role").asString()).isEqualTo("CANDIDATE");
+        assertThat(payload.get("profileComplete").asBoolean()).isFalse();
     }
 
     @Test
@@ -183,58 +198,70 @@ class AuthIntegrationTests {
                 JwsHeader.with(MacAlgorithm.HS256).build(),
                 claims)).getTokenValue();
 
-        mockMvc.perform(get("/api/v1/auth/me")
-                        .header("Authorization", "Bearer " + expiredToken))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        HttpResponse<String> response = get("/api/v1/auth/me", expiredToken);
+
+        assertThat(response.statusCode()).isEqualTo(401);
+        assertThat(json(response).get("code").asString()).isEqualTo("UNAUTHENTICATED");
     }
 
     @Test
     void authEndpointsRemainPublicWhileProtectedEndpointRequiresAuthentication() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        HttpResponse<String> register = postJson("/api/v1/auth/register", "{}");
+        HttpResponse<String> login = postJson("/api/v1/auth/login", "{}");
+        HttpResponse<String> me = get("/api/v1/auth/me", null);
 
-        mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-
-        mockMvc.perform(get("/api/v1/auth/me"))
-                .andExpect(status().isUnauthorized());
+        assertThat(register.statusCode()).isEqualTo(400);
+        assertThat(json(register).get("code").asString()).isEqualTo("VALIDATION_ERROR");
+        assertThat(login.statusCode()).isEqualTo(400);
+        assertThat(json(login).get("code").asString()).isEqualTo("VALIDATION_ERROR");
+        assertThat(me.statusCode()).isEqualTo(401);
     }
 
-    private org.springframework.test.web.servlet.ResultActions register(
-            String email,
-            String password,
-            String name,
-            String role) throws Exception {
+    private HttpResponse<String> register(String email, String password, String name, String role)
+            throws IOException, InterruptedException {
         String body = """
                 {"email":"%s","password":"%s","name":"%s","role":"%s"}
                 """.formatted(email, password, name, role);
-        return mockMvc.perform(post("/api/v1/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body));
+        return postJson("/api/v1/auth/register", body);
     }
 
-    private org.springframework.test.web.servlet.ResultActions login(String email, String password) throws Exception {
+    private HttpResponse<String> login(String email, String password) throws IOException, InterruptedException {
         String body = """
                 {"email":"%s","password":"%s"}
                 """.formatted(email, password);
-        return mockMvc.perform(post("/api/v1/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body));
+        return postJson("/api/v1/auth/login", body);
     }
 
     private String loginToken(String email, String password) throws Exception {
-        MvcResult result = login(email, password)
-                .andExpect(status().isOk())
-                .andReturn();
-        return jsonMapper.readTree(result.getResponse().getContentAsString())
-                .get("accessToken")
-                .asString();
+        HttpResponse<String> response = login(email, password);
+        assertThat(response.statusCode()).isEqualTo(200);
+        return json(response).get("accessToken").asString();
+    }
+
+    private HttpResponse<String> postJson(String path, String body) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(uri(path))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> get(String path, String accessToken) throws IOException, InterruptedException {
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(uri(path))
+                .GET();
+        if (accessToken != null) {
+            builder.header("Authorization", "Bearer " + accessToken);
+        }
+        return httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private JsonNode json(HttpResponse<String> response) {
+        return jsonMapper.readTree(response.body());
+    }
+
+    private URI uri(String path) {
+        return URI.create("http://localhost:" + port + path);
     }
 }
