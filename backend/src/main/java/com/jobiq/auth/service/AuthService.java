@@ -22,8 +22,11 @@ import com.jobiq.auth.exception.InvalidCredentialsException;
 import com.jobiq.auth.exception.UnauthenticatedException;
 import com.jobiq.auth.security.JwtService;
 import com.jobiq.auth.security.JwtService.IssuedAccessToken;
+import com.jobiq.candidates.service.CandidateProfileStatusService;
+import com.jobiq.recruiters.service.RecruiterProfileStatusService;
 import com.jobiq.shared.error.ApiFieldError;
 import com.jobiq.users.domain.User;
+import com.jobiq.users.domain.UserRole;
 import com.jobiq.users.repository.UserRepository;
 
 import jakarta.validation.ConstraintViolation;
@@ -35,11 +38,11 @@ import jakarta.validation.constraints.Size;
 @Service
 public class AuthService {
 
-    private static final boolean PROFILE_COMPLETE_BEFORE_SLICE_4 = false;
-
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final CandidateProfileStatusService candidateProfileStatusService;
+    private final RecruiterProfileStatusService recruiterProfileStatusService;
     private final Clock clock;
     private final Validator validator;
     private final String dummyPasswordHash;
@@ -48,11 +51,15 @@ public class AuthService {
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
+            CandidateProfileStatusService candidateProfileStatusService,
+            RecruiterProfileStatusService recruiterProfileStatusService,
             Clock clock,
             Validator validator) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.candidateProfileStatusService = candidateProfileStatusService;
+        this.recruiterProfileStatusService = recruiterProfileStatusService;
         this.clock = clock;
         this.validator = validator;
         this.dummyPasswordHash = passwordEncoder.encode("jobiq-auth-timing-placeholder");
@@ -67,12 +74,7 @@ public class AuthService {
 
         Instant now = clock.instant();
         User user = User.create(
-                UUID.randomUUID(),
-                email,
-                passwordEncoder.encode(request.password()),
-                request.name().trim(),
-                request.role(),
-                now);
+                UUID.randomUUID(), email, passwordEncoder.encode(request.password()), request.name().trim(), request.role(), now);
 
         try {
             userRepository.saveAndFlush(user);
@@ -99,15 +101,11 @@ public class AuthService {
     @Transactional(readOnly = true)
     public AuthMeResponse currentUser(UUID userId) {
         User user = userRepository.findById(userId).orElseThrow(UnauthenticatedException::new);
-
-        // Slice 3 transitional semantics: profile modules do not exist yet.
-        // Slice 4 must replace this with the real role-specific profile completeness calculation.
-        return new AuthMeResponse(
-                user.getId(),
-                user.getEmail(),
-                user.getName(),
-                user.getRole(),
-                PROFILE_COMPLETE_BEFORE_SLICE_4);
+        boolean profileComplete = switch (user.getRole()) {
+            case CANDIDATE -> candidateProfileStatusService.existsForUser(userId);
+            case RECRUITER -> recruiterProfileStatusService.existsForUser(userId);
+        };
+        return new AuthMeResponse(user.getId(), user.getEmail(), user.getName(), user.getRole(), profileComplete);
     }
 
     private String normalizeAndValidateEmail(String rawEmail) {
@@ -119,7 +117,6 @@ public class AuthService {
         return normalized;
     }
 
-    private record NormalizedEmail(
-            @NotBlank @Email @Size(max = 320) String value) {
+    private record NormalizedEmail(@NotBlank @Email @Size(max = 320) String value) {
     }
 }
