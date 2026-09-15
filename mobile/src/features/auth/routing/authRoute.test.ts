@@ -1,33 +1,29 @@
 import type { AuthUser } from '../../../types/auth';
 import { resolveAuthRoute } from './authRoute';
 
-const candidate: AuthUser = {
-  id: 'candidate-id',
-  email: 'candidate@example.com',
-  name: 'Candidate',
-  role: 'CANDIDATE',
-  profileComplete: false,
-};
-
-const recruiter: AuthUser = {
-  ...candidate,
-  id: 'recruiter-id',
-  email: 'recruiter@example.com',
-  name: 'Recruiter',
-  role: 'RECRUITER',
-};
+function user(role: AuthUser['role'], profileComplete: boolean): AuthUser {
+  return {
+    id: `${role.toLowerCase()}-id`,
+    email: `${role.toLowerCase()}@example.com`,
+    name: role,
+    role,
+    profileComplete,
+  };
+}
 
 describe('auth routing', () => {
   it('routes unauthenticated users to public login', () => {
     expect(resolveAuthRoute('unauthenticated', null)).toBe('/(public)/login');
   });
 
-  it('routes authenticated candidates to the candidate shell', () => {
-    expect(resolveAuthRoute('authenticated', candidate)).toBe('/(candidate)/candidate');
+  it('routes an incomplete Candidate to onboarding and a completed Candidate to its shell', () => {
+    expect(resolveAuthRoute('authenticated', user('CANDIDATE', false))).toBe('/(candidate)/onboarding');
+    expect(resolveAuthRoute('authenticated', user('CANDIDATE', true))).toBe('/(candidate)/candidate');
   });
 
-  it('routes authenticated recruiters to the recruiter shell', () => {
-    expect(resolveAuthRoute('authenticated', recruiter)).toBe('/(recruiter)/recruiter');
+  it('routes an incomplete Recruiter to onboarding and a completed Recruiter to its shell', () => {
+    expect(resolveAuthRoute('authenticated', user('RECRUITER', false))).toBe('/(recruiter)/onboarding');
+    expect(resolveAuthRoute('authenticated', user('RECRUITER', true))).toBe('/(recruiter)/recruiter');
   });
 
   it('does not route while checking or after a recoverable bootstrap error', () => {

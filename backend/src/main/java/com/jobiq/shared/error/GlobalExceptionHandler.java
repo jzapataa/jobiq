@@ -2,6 +2,7 @@ package com.jobiq.shared.error;
 
 import java.util.List;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -22,8 +23,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ApiErrorResponse> validation(MethodArgumentNotValidException exception, HttpServletRequest request) {
         List<ApiFieldError> fieldErrors = exception.getBindingResult().getFieldErrors().stream()
-                .map(error -> new ApiFieldError(
-                        error.getField(),
+                .map(error -> new ApiFieldError(error.getField(),
                         error.getDefaultMessage() == null ? "invalid value" : error.getDefaultMessage()))
                 .toList();
         return response(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Request validation failed", fieldErrors, request);
@@ -31,12 +31,14 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AuthValidationException.class)
     ResponseEntity<ApiErrorResponse> authValidation(AuthValidationException exception, HttpServletRequest request) {
-        return response(
-                HttpStatus.BAD_REQUEST,
-                "VALIDATION_ERROR",
-                "Request validation failed",
-                exception.getFieldErrors(),
-                request);
+        return response(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Request validation failed",
+                exception.getFieldErrors(), request);
+    }
+
+    @ExceptionHandler(ProfileValidationException.class)
+    ResponseEntity<ApiErrorResponse> profileValidation(ProfileValidationException exception, HttpServletRequest request) {
+        return response(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Request validation failed",
+                exception.getFieldErrors(), request);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -59,18 +61,23 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.CONFLICT, "EMAIL_ALREADY_EXISTS", "Email already exists", List.of(), request);
     }
 
+    @ExceptionHandler(ProfileNotFoundException.class)
+    ResponseEntity<ApiErrorResponse> profileNotFound(ProfileNotFoundException exception, HttpServletRequest request) {
+        return response(HttpStatus.NOT_FOUND, "PROFILE_NOT_FOUND", "Profile not found", List.of(), request);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ResponseEntity<ApiErrorResponse> conflict(DataIntegrityViolationException exception, HttpServletRequest request) {
+        return response(HttpStatus.CONFLICT, "CONFLICT", "Request conflicts with current state", List.of(), request);
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiErrorResponse> internalError(Exception exception, HttpServletRequest request) {
         return response(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Internal server error", List.of(), request);
     }
 
-    private ResponseEntity<ApiErrorResponse> response(
-            HttpStatus status,
-            String code,
-            String message,
-            List<ApiFieldError> fieldErrors,
-            HttpServletRequest request) {
-        return ResponseEntity.status(status)
-                .body(ApiErrorFactory.create(request, code, message, fieldErrors));
+    private ResponseEntity<ApiErrorResponse> response(HttpStatus status, String code, String message,
+            List<ApiFieldError> fieldErrors, HttpServletRequest request) {
+        return ResponseEntity.status(status).body(ApiErrorFactory.create(request, code, message, fieldErrors));
     }
 }

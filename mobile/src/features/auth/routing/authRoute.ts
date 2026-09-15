@@ -1,7 +1,13 @@
 import type { AuthStatus } from '../store/authState';
 import type { AuthUser } from '../../../types/auth';
 
-export type AuthRoute = '/(public)/login' | '/(candidate)/candidate' | '/(recruiter)/recruiter' | null;
+export type AuthRoute =
+  | '/(public)/login'
+  | '/(candidate)/onboarding'
+  | '/(candidate)/candidate'
+  | '/(recruiter)/onboarding'
+  | '/(recruiter)/recruiter'
+  | null;
 
 export function resolveAuthRoute(status: AuthStatus, user: AuthUser | null): AuthRoute {
   if (status === 'unauthenticated') {
@@ -9,11 +15,11 @@ export function resolveAuthRoute(status: AuthStatus, user: AuthUser | null): Aut
   }
 
   if (status === 'authenticated' && user?.role === 'CANDIDATE') {
-    return '/(candidate)/candidate';
+    return user.profileComplete ? '/(candidate)/candidate' : '/(candidate)/onboarding';
   }
 
   if (status === 'authenticated' && user?.role === 'RECRUITER') {
-    return '/(recruiter)/recruiter';
+    return user.profileComplete ? '/(recruiter)/recruiter' : '/(recruiter)/onboarding';
   }
 
   return null;
