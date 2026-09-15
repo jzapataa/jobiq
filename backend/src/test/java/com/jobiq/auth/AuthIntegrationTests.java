@@ -142,7 +142,7 @@ class AuthIntegrationTests {
 
         assertThat(jwt.getSubject()).isEqualTo(user.getId().toString());
         assertThat(jwt.getClaimAsString("role")).isEqualTo("CANDIDATE");
-        assertThat(jwt.getIssuer()).hasToString(jwtProperties.issuer());
+        assertThat(jwt.getClaimAsString("iss")).isEqualTo(jwtProperties.issuer());
         assertThat(jwt.getIssuedAt()).isNotNull();
         assertThat(jwt.getExpiresAt()).isAfter(jwt.getIssuedAt());
     }
