@@ -1,4 +1,4 @@
-import { Link, Redirect } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
@@ -19,12 +19,18 @@ export default function RecruiterSessionScreen() {
     <View style={[styles.container, { backgroundColor }]}>
       <ThemedText type="title">Recruiter</ThemedText>
       <ThemedText type="subtitle">Perfil y empresa completados. Jobs llegará en un slice posterior.</ThemedText>
-      <Link href="/(recruiter)/profile" asChild>
-        <Pressable style={[styles.button, { backgroundColor: primaryColor }]}><ThemedText>Editar posición</ThemedText></Pressable>
-      </Link>
-      <Link href="/(recruiter)/company" asChild>
-        <Pressable style={[styles.button, { backgroundColor: primaryColor }]}><ThemedText>Editar empresa</ThemedText></Pressable>
-      </Link>
+      <Pressable
+        onPress={() => router.push('/(recruiter)/profile')}
+        style={[styles.button, { backgroundColor: primaryColor }]}
+      >
+        <ThemedText>Editar posición</ThemedText>
+      </Pressable>
+      <Pressable
+        onPress={() => router.push('/(recruiter)/company')}
+        style={[styles.button, { backgroundColor: primaryColor }]}
+      >
+        <ThemedText>Editar empresa</ThemedText>
+      </Pressable>
       <Pressable onPress={() => void logout()} style={[styles.button, { backgroundColor: primaryColor }]}>
         <ThemedText>Cerrar sesión</ThemedText>
       </Pressable>

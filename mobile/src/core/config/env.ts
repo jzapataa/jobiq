@@ -27,7 +27,7 @@ function parseTimeout(value: string | undefined, fallback: number): number {
 }
 
 export function readAppConfig(
-  environment: Record<string, string | undefined> = process.env,
+  environment: Record<string, string | undefined> = {},
 ): AppConfig {
   const appEnv = parseEnvironment(environment.EXPO_PUBLIC_APP_ENV);
   const fallbackTimeout = appEnv === 'local' ? DEFAULT_LOCAL_TIMEOUT_MS : DEFAULT_REMOTE_TIMEOUT_MS;
@@ -39,4 +39,8 @@ export function readAppConfig(
   };
 }
 
-export const appConfig = readAppConfig();
+export const appConfig = readAppConfig({
+  EXPO_PUBLIC_APP_ENV: process.env.EXPO_PUBLIC_APP_ENV,
+  EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
+  EXPO_PUBLIC_API_TIMEOUT_MS: process.env.EXPO_PUBLIC_API_TIMEOUT_MS,
+});
